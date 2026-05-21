@@ -7,6 +7,7 @@ from pathlib import Path
 
 from src.dynamic_defense.ceni_adapter import CeniActionAdapter
 from src.dynamic_defense.defense_engine import DynamicDefenseEngine
+from src.dynamic_defense.torch_detector import TorchFlowDetector
 from src.dynamic_defense.feature_extractor import ThreatFeatureMatcher, build_heuristic_templates, build_templates_from_labeled_csv
 from src.dynamic_defense.policy_store import PolicyStore
 from src.dynamic_defense.utils import dump_json
@@ -23,6 +24,10 @@ def main() -> None:
     parser.add_argument("--limit", type=int, default=2000, help="最多处理行数")
     parser.add_argument("--adapter", choices=["dry_run", "rest", "local"], default="dry_run", help="防御动作执行模式")
     parser.add_argument("--controller-endpoint", default=None, help="REST 模式下的控制器地址")
+    parser.add_argument("--detector", choices=["template", "torch", "hybrid"], default="template")
+    parser.add_argument("--torch-model", default="models/torch_flow_classifier.pt")
+    parser.add_argument("--torch-meta", default="models/torch_flow_classifier_meta.json")
+    parser.add_argument("--torch-threshold", type=float, default=0.70)
     parser.add_argument("--out-csv", default="reports/dynamic_defense_events.csv")
     parser.add_argument("--out-json", default="reports/dynamic_defense_summary.json")
     args = parser.parse_args()
@@ -37,12 +42,29 @@ def main() -> None:
     store = PolicyStore(args.db)
     matcher = ThreatFeatureMatcher.from_path_or_config(args.templates, args.config)
     adapter = CeniActionAdapter(mode=args.adapter, endpoint=args.controller_endpoint)
-    engine = DynamicDefenseEngine(store=store, matcher=matcher, adapter=adapter)
+
+    torch_detector = None
+    if args.detector in {"torch", "hybrid"}:
+        torch_detector = TorchFlowDetector(
+            model_path=args.torch_model,
+            meta_path=args.torch_meta,
+            device="cpu",
+        )
+
+    engine = DynamicDefenseEngine(
+        store=store,
+        matcher=matcher,
+        adapter=adapter,
+        detector_mode=args.detector,
+        torch_detector=torch_detector,
+        torch_confidence_threshold=args.torch_threshold,
+    )
     events = engine.run_on_csv(args.input, window_size=args.window_size, limit=args.limit)
 
     Path(args.out_csv).parent.mkdir(parents=True, exist_ok=True)
     events.to_csv(args.out_csv, index=False)
     summary = {
+        "detector": args.detector,
         "windows": int(len(events)),
         "adjustment_events": int(events["adjustment_triggered"].sum()) if len(events) else 0,
         "detection_success_rate": float(events["detection_success"].mean()) if len(events) and "detection_success" in events.columns else 0.0,
