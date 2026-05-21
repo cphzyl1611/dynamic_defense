@@ -1,0 +1,12 @@
+{
+  "rows": 2000,
+  "matched_attack_counts": {
+    "SSH-Patator": 742,
+    "FTP-Patator": 430,
+    "PortScan": 351,
+    "UNKNOWN": 279,
+    "DDoS": 198
+  },
+  "avg_match_score": 0.7925369575437226,
+  "output_csv": "reports/feature_match_report.csv"
+}

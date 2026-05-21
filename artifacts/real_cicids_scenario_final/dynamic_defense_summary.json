@@ -1,0 +1,13 @@
+{
+  "windows": 10,
+  "adjustment_events": 9,
+  "detection_success_rate": 1.0,
+  "defense_success_rate": 1.0,
+  "strategy_counts": {
+    "s_bruteforce_ssh_ftp": 4,
+    "s_benign_monitor": 2,
+    "s_ddos_vote_rate_limit": 2,
+    "s_portscan_isolate": 2
+  },
+  "output_csv": "reports/dynamic_defense_events.csv"
+}
