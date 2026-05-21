@@ -55,16 +55,34 @@ class DynamicDefenseEngine:
 
         labels = window["Label"].astype(str) if "Label" in window.columns else pd.Series([""] * len(window))
         attack_present = any(self._is_attack_label(x) for x in labels)
+
+        # detection_success：检测结果是否与数据标签一致。
         detected_as_attack = attack_type != "UNKNOWN" and avg_score >= self.confidence_threshold
-        success = (attack_present and detected_as_attack) or ((not attack_present) and (not detected_as_attack))
-        # 奖励函数：检出攻击得分高；误报/漏报惩罚；策略代价作为负项。
-        if attack_present and detected_as_attack:
+        detection_success = (attack_present and detected_as_attack) or ((not attack_present) and (not detected_as_attack))
+
+        # defense_success：动态防御是否触发了合理响应。
+        # 这个指标关注策略选择、模型切换、限速、隔离、日志增强等动作是否被调度。
+        has_policy = policy is not None
+        has_actions = bool(policy.actions)
+        known_attack_policy = attack_type != "UNKNOWN" and policy.strategy_id != "s_unknown_similarity"
+        fallback_policy = attack_type == "UNKNOWN" and policy.strategy_id == "s_unknown_similarity"
+        defense_success = has_policy and has_actions and (known_attack_policy or fallback_policy)
+
+        # 奖励函数：
+        # 1. 检测正确且防御响应成功：高奖励；
+        # 2. 正常流量被正确保持：中等奖励；
+        # 3. 检测不确定但已触发合理防御响应：中等奖励；
+        # 4. 无有效响应：惩罚。
+        if attack_present and detected_as_attack and defense_success:
             reward = 1.0 + min(avg_score, 1.0) - policy.cost
         elif not attack_present and not detected_as_attack:
             reward = 0.6 - policy.cost
+        elif defense_success:
+            reward = 0.7 + min(avg_score, 0.5) - policy.cost
         else:
             reward = -1.0 - policy.cost
-        self.optimizer.observe(policy.strategy_id, reward=reward, success=success)
+
+        self.optimizer.observe(policy.strategy_id, reward=reward, success=defense_success)
 
         adjustment_triggered = self.current_strategy_id != policy.strategy_id or attack_present
         self.current_strategy_id = policy.strategy_id
@@ -85,7 +103,8 @@ class DynamicDefenseEngine:
                 "strategy_id": policy.strategy_id,
                 "model_type": policy.model_type,
                 "adjustment_triggered": bool(adjustment_triggered),
-                "defense_success": bool(success),
+                "detection_success": bool(detection_success),
+                "defense_success": bool(defense_success),
                 "reward": float(reward),
                 "actions": [asdict(r) for r in action_results],
             }

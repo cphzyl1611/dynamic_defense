@@ -45,6 +45,7 @@ def main() -> None:
     summary = {
         "windows": int(len(events)),
         "adjustment_events": int(events["adjustment_triggered"].sum()) if len(events) else 0,
+        "detection_success_rate": float(events["detection_success"].mean()) if len(events) and "detection_success" in events.columns else 0.0,
         "defense_success_rate": float(events["defense_success"].mean()) if len(events) else 0.0,
         "strategy_counts": events["strategy_id"].value_counts().to_dict() if len(events) else {},
         "output_csv": args.out_csv,
