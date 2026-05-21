@@ -12,3 +12,4 @@ data/policies.sqlite
 data/threat_templates.json
 reports/*.csv
 reports/*.json
+reports/*.jsonl
