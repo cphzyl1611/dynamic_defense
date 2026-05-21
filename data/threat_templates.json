@@ -1,0 +1,90 @@
+{
+  "feature_columns": [
+    "Flow Duration",
+    "Total Fwd Packets",
+    "Total Backward Packets",
+    "Total Length of Fwd Packets",
+    "Total Length of Bwd Packets",
+    "Fwd Packet Length Max",
+    "Bwd Packet Length Max",
+    "Flow Bytes/s",
+    "Flow Packets/s",
+    "SYN Flag Count",
+    "ACK Flag Count",
+    "Destination Port"
+  ],
+  "scaler": {
+    "mean": {
+      "Flow Duration": 21400.56518022041,
+      "Total Fwd Packets": 28.312857142857144,
+      "Total Backward Packets": 4.39,
+      "Total Length of Fwd Packets": 2611.2763732447706,
+      "Total Length of Bwd Packets": 348.59698433437273,
+      "Fwd Packet Length Max": 67.68681906221596,
+      "Bwd Packet Length Max": 67.49989522784263,
+      "Flow Bytes/s": 60096.83069896325,
+      "Flow Packets/s": 1509.1640478411507,
+      "SYN Flag Count": 3.2385714285714284,
+      "ACK Flag Count": 0.42714285714285716,
+      "Destination Port": 291.6042857142857
+    },
+    "std": {
+      "Flow Duration": 30441.18281247783,
+      "Total Fwd Packets": 32.91751698695003,
+      "Total Backward Packets": 3.240597712401133,
+      "Total Length of Fwd Packets": 3441.7790051672328,
+      "Total Length of Bwd Packets": 264.04548100689067,
+      "Fwd Packet Length Max": 29.981419792713755,
+      "Bwd Packet Length Max": 30.978111437532345,
+      "Flow Bytes/s": 93794.06493479648,
+      "Flow Packets/s": 2168.8082191916624,
+      "SYN Flag Count": 4.109230784651638,
+      "ACK Flag Count": 0.6630275702878291,
+      "Destination Port": 587.5103790361227
+    }
+  },
+  "templates": {
+    "DDoS": {
+      "Flow Duration": -0.6382522053010629,
+      "Total Fwd Packets": 1.5702017523871545,
+      "Total Backward Packets": -0.7375182642553679,
+      "Total Length of Fwd Packets": 1.5341186906189699,
+      "Total Length of Bwd Packets": -0.5583316623046222,
+      "Fwd Packet Length Max": 1.0931058858143539,
+      "Bwd Packet Length Max": -0.06799030874922955,
+      "Flow Bytes/s": 1.5254600927853552,
+      "Flow Packets/s": 1.4884505418321607,
+      "SYN Flag Count": 1.6454243934614576,
+      "ACK Flag Count": -0.6442309132898181,
+      "Destination Port": -0.36017114465525957
+    },
+    "PortScan": {
+      "Flow Duration": -0.6862906329062305,
+      "Total Fwd Packets": -0.8297362511785193,
+      "Total Backward Packets": -1.3546883598665547,
+      "Total Length of Fwd Packets": -0.7357687868621106,
+      "Total Length of Bwd Packets": -1.1694164286329027,
+      "Fwd Packet Length Max": -1.0297503290659602,
+      "Bwd Packet Length Max": -0.8664101130220307,
+      "Flow Bytes/s": -0.6375913590535096,
+      "Flow Packets/s": -0.5574504790785235,
+      "SYN Flag Count": -0.788121085987138,
+      "ACK Flag Count": -0.6442309132898181,
+      "Destination Port": 1.3010761027571838
+    },
+    "SSH-Patator": {
+      "Flow Duration": -0.5388112325217682,
+      "Total Fwd Packets": -0.4044307821921974,
+      "Total Backward Packets": 1.113992022578192,
+      "Total Length of Fwd Packets": -0.4949530165460475,
+      "Total Length of Bwd Packets": 0.20544976529425413,
+      "Fwd Packet Length Max": -0.1904726460609597,
+      "Bwd Packet Length Max": -0.5283325765541718,
+      "Flow Bytes/s": -0.5887580822456474,
+      "Flow Packets/s": -0.6057658009635389,
+      "SYN Flag Count": -0.3014119900974189,
+      "ACK Flag Count": 0.8640019940776489,
+      "Destination Port": -0.45889280484985145
+    }
+  }
+}

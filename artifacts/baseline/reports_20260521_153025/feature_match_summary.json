@@ -1,0 +1,10 @@
+{
+  "rows": 300,
+  "matched_attack_counts": {
+    "SSH-Patator": 103,
+    "DDoS": 100,
+    "UNKNOWN": 97
+  },
+  "avg_match_score": 0.4812047829433246,
+  "output_csv": "reports/feature_match_report.csv"
+}

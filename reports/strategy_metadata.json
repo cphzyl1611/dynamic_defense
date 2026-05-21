@@ -1,0 +1,80 @@
+{
+  "loaded": 6,
+  "policies": [
+    {
+      "strategy_id": "s_ddos_vote_rate_limit",
+      "name": "DDoS majority-vote + rate-limit",
+      "model_type": "ensemble",
+      "attack_types": [
+        "DDoS",
+        "DoS Hulk",
+        "DoS GoldenEye",
+        "DoS slowloris",
+        "DoS Slowhttptest"
+      ],
+      "priority": 90,
+      "cost": 0.25,
+      "last_updated_at": "2026-05-21T07:30:58.422552"
+    },
+    {
+      "strategy_id": "s_portscan_isolate",
+      "name": "PortScan isolate + log-enrich",
+      "model_type": "hybrid",
+      "attack_types": [
+        "PortScan"
+      ],
+      "priority": 80,
+      "cost": 0.18,
+      "last_updated_at": "2026-05-21T07:30:58.422552"
+    },
+    {
+      "strategy_id": "s_bruteforce_ssh_ftp",
+      "name": "SSH/FTP brute-force adaptive detector",
+      "model_type": "sequence",
+      "attack_types": [
+        "SSH-Patator",
+        "FTP-Patator",
+        "Brute Force"
+      ],
+      "priority": 75,
+      "cost": 0.15,
+      "last_updated_at": "2026-05-21T07:30:58.422552"
+    },
+    {
+      "strategy_id": "s_web_attack_strict",
+      "name": "Web attack strict policy",
+      "model_type": "web",
+      "attack_types": [
+        "Web Attack",
+        "Web Attack Brute Force",
+        "Web Attack Sql Injection",
+        "Web Attack XSS"
+      ],
+      "priority": 70,
+      "cost": 0.2,
+      "last_updated_at": "2026-05-21T07:30:58.422552"
+    },
+    {
+      "strategy_id": "s_heartbleed_deep_inspection",
+      "name": "Heartbleed deep inspection",
+      "model_type": "protocol",
+      "attack_types": [
+        "Heartbleed"
+      ],
+      "priority": 85,
+      "cost": 0.3,
+      "last_updated_at": "2026-05-21T07:30:58.422552"
+    },
+    {
+      "strategy_id": "s_unknown_similarity",
+      "name": "Unknown threat similarity-based fallback",
+      "model_type": "fallback",
+      "attack_types": [
+        "UNKNOWN"
+      ],
+      "priority": 40,
+      "cost": 0.1,
+      "last_updated_at": "2026-05-21T07:30:58.422552"
+    }
+  ]
+}
