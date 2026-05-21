@@ -22,7 +22,7 @@ class DynamicDefenseEngine:
         matcher: ThreatFeatureMatcher,
         adapter: CeniActionAdapter,
         epsilon: float = 0.05,
-        confidence_threshold: float = 0.25,
+        confidence_threshold: float = 0.70,
     ):
         self.store = store
         self.matcher = matcher
@@ -51,8 +51,6 @@ class DynamicDefenseEngine:
         attack_votes = pd.Series([m.attack_type for m in matches]).value_counts()
         attack_type = str(attack_votes.index[0]) if not attack_votes.empty else "UNKNOWN"
         avg_score = float(np.mean([m.score for m in matches])) if matches else 0.0
-        policy = self.optimizer.select(attack_type)
-
         labels = window["Label"].astype(str) if "Label" in window.columns else pd.Series([""] * len(window))
         attack_present = any(self._is_attack_label(x) for x in labels)
 
@@ -60,13 +58,18 @@ class DynamicDefenseEngine:
         detected_as_attack = attack_type != "UNKNOWN" and avg_score >= self.confidence_threshold
         detection_success = (attack_present and detected_as_attack) or ((not attack_present) and (not detected_as_attack))
 
+        raw_attack_type = attack_type
+        effective_attack_type = attack_type if detected_as_attack else "BENIGN"
+        policy = self.optimizer.select(effective_attack_type)
+
         # defense_success：动态防御是否触发了合理响应。
         # 这个指标关注策略选择、模型切换、限速、隔离、日志增强等动作是否被调度。
         has_policy = policy is not None
         has_actions = bool(policy.actions)
-        known_attack_policy = attack_type != "UNKNOWN" and policy.strategy_id != "s_unknown_similarity"
-        fallback_policy = attack_type == "UNKNOWN" and policy.strategy_id == "s_unknown_similarity"
-        defense_success = has_policy and has_actions and (known_attack_policy or fallback_policy)
+        benign_policy = effective_attack_type == "BENIGN" and policy.strategy_id == "s_benign_monitor"
+        known_attack_policy = effective_attack_type not in {"UNKNOWN", "BENIGN"} and policy.strategy_id not in {"s_unknown_similarity", "s_benign_monitor"}
+        fallback_policy = effective_attack_type == "UNKNOWN" and policy.strategy_id == "s_unknown_similarity"
+        defense_success = has_policy and has_actions and (benign_policy or known_attack_policy or fallback_policy)
 
         # 奖励函数：
         # 1. 检测正确且防御响应成功：高奖励；
@@ -88,7 +91,8 @@ class DynamicDefenseEngine:
         self.current_strategy_id = policy.strategy_id
         context = {
             "window_id": window_id,
-            "attack_type": attack_type,
+            "attack_type": effective_attack_type,
+            "raw_matched_attack_type": raw_attack_type,
             "avg_match_score": avg_score,
             "attack_present_by_label": attack_present,
             "rows": int(len(window)),
@@ -98,7 +102,8 @@ class DynamicDefenseEngine:
             {
                 "window_id": window_id,
                 "rows": int(len(window)),
-                "attack_type": attack_type,
+                "attack_type": effective_attack_type,
+                "raw_matched_attack_type": raw_attack_type,
                 "avg_match_score": avg_score,
                 "strategy_id": policy.strategy_id,
                 "model_type": policy.model_type,

@@ -82,3 +82,16 @@ strategies:
         voters: 3
       - type: log_enrich
         fields: [all_core_features]
+
+  - strategy_id: s_benign_monitor
+    name: Benign traffic monitor-only policy
+    model_type: monitor
+    attack_types: [BENIGN, NORMAL]
+    priority: 30
+    cost: 0.02
+    actions:
+      - type: monitor_only
+        scope: baseline_window
+      - type: log_enrich
+        fields: [window_summary]
+
