@@ -23,12 +23,18 @@ class DynamicDefenseEngine:
         adapter: CeniActionAdapter,
         epsilon: float = 0.05,
         confidence_threshold: float = 0.70,
+        detector_mode: str = "template",
+        torch_detector=None,
+        torch_confidence_threshold: float = 0.70,
     ):
         self.store = store
         self.matcher = matcher
         self.adapter = adapter
         self.optimizer = ActorCriticLikeOptimizer(store, epsilon=epsilon)
         self.confidence_threshold = confidence_threshold
+        self.detector_mode = detector_mode
+        self.torch_detector = torch_detector
+        self.torch_confidence_threshold = torch_confidence_threshold
         self.current_strategy_id = None
 
     @staticmethod
@@ -49,13 +55,45 @@ class DynamicDefenseEngine:
     def _handle_window(self, window: pd.DataFrame, window_id: int) -> List[Dict]:
         matches = [self.matcher.match_row(row) for _, row in window.iterrows()]
         attack_votes = pd.Series([m.attack_type for m in matches]).value_counts()
-        attack_type = str(attack_votes.index[0]) if not attack_votes.empty else "UNKNOWN"
-        avg_score = float(np.mean([m.score for m in matches])) if matches else 0.0
+        template_attack_type = str(attack_votes.index[0]) if not attack_votes.empty else "UNKNOWN"
+        template_score = float(np.mean([m.score for m in matches])) if matches else 0.0
+
+        torch_label = None
+        torch_confidence = None
+        detector_source = "template"
+
+        if self.detector_mode in {"torch", "hybrid"}:
+            if self.torch_detector is None:
+                raise RuntimeError("detector_mode requires torch_detector, but torch_detector is None")
+            torch_result = self.torch_detector.predict_window(window)
+            torch_label = torch_result.predicted_label
+            torch_confidence = float(torch_result.confidence)
+
+        if self.detector_mode == "template":
+            attack_type = template_attack_type
+            avg_score = template_score
+            detector_source = "template"
+        elif self.detector_mode == "torch":
+            attack_type = torch_label or "UNKNOWN"
+            avg_score = float(torch_confidence or 0.0)
+            detector_source = "torch"
+        elif self.detector_mode == "hybrid":
+            if torch_confidence is not None and torch_confidence >= self.torch_confidence_threshold:
+                attack_type = torch_label or "UNKNOWN"
+                avg_score = float(torch_confidence)
+                detector_source = "torch"
+            else:
+                attack_type = template_attack_type
+                avg_score = template_score
+                detector_source = "template_fallback"
+        else:
+            raise RuntimeError(f"unsupported detector_mode: {self.detector_mode}")
+
         labels = window["Label"].astype(str) if "Label" in window.columns else pd.Series([""] * len(window))
         attack_present = any(self._is_attack_label(x) for x in labels)
 
         # detection_success：检测结果是否与数据标签一致。
-        detected_as_attack = attack_type != "UNKNOWN" and avg_score >= self.confidence_threshold
+        detected_as_attack = attack_type not in {"UNKNOWN", "BENIGN", "NORMAL"} and avg_score >= self.confidence_threshold
         detection_success = (attack_present and detected_as_attack) or ((not attack_present) and (not detected_as_attack))
 
         raw_attack_type = attack_type
@@ -96,6 +134,11 @@ class DynamicDefenseEngine:
             "avg_match_score": avg_score,
             "attack_present_by_label": attack_present,
             "rows": int(len(window)),
+            "detector_source": detector_source,
+            "template_attack_type": template_attack_type,
+            "template_score": template_score,
+            "torch_label": torch_label,
+            "torch_confidence": torch_confidence,
         }
         action_results = self.adapter.execute_actions(policy.strategy_id, policy.actions, context) if adjustment_triggered else []
         return [
@@ -105,6 +148,11 @@ class DynamicDefenseEngine:
                 "attack_type": effective_attack_type,
                 "raw_matched_attack_type": raw_attack_type,
                 "avg_match_score": avg_score,
+                "detector_source": detector_source,
+                "template_attack_type": template_attack_type,
+                "template_score": float(template_score),
+                "torch_label": torch_label,
+                "torch_confidence": torch_confidence,
                 "strategy_id": policy.strategy_id,
                 "model_type": policy.model_type,
                 "adjustment_triggered": bool(adjustment_triggered),
