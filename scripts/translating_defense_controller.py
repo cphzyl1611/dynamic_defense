@@ -3,6 +3,13 @@ from pathlib import Path
 from datetime import datetime
 import argparse
 import json
+import sys
+
+ROOT = Path(__file__).resolve().parents[1]
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
+
+from src.dynamic_defense.action_executor import ActionExecutor
 
 
 def translate_action(payload):
@@ -91,6 +98,7 @@ def translate_action(payload):
 class Handler(BaseHTTPRequestHandler):
     raw_log_file = Path("reports/controller_actions.jsonl")
     translated_log_file = Path("reports/controller_translated_actions.jsonl")
+    execution_mode = "simulated"
 
     def do_POST(self):
         length = int(self.headers.get("Content-Length", "0"))
@@ -108,6 +116,12 @@ class Handler(BaseHTTPRequestHandler):
         }
 
         translated_record = translate_action(payload)
+        executor = ActionExecutor(execution_mode=self.execution_mode)
+        execution_result = executor.execute(
+            strategy_id=str(payload.get("strategy_id", "")),
+            action=payload.get("action", {}),
+            context=payload.get("context", {}),
+        )
 
         self.raw_log_file.parent.mkdir(parents=True, exist_ok=True)
 
@@ -120,7 +134,8 @@ class Handler(BaseHTTPRequestHandler):
         response = {
             "status": "OK",
             "message": "action translated",
-            "translated": translated_record["translated"]
+            "translated": translated_record["translated"],
+            "execution_result": execution_result,
         }
 
         data = json.dumps(response, ensure_ascii=False).encode("utf-8")
@@ -138,12 +153,17 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--host", default="127.0.0.1")
     parser.add_argument("--port", type=int, default=18081)
+    parser.add_argument("--execution-mode", choices=["simulated", "stateful", "shell"], default="simulated")
     args = parser.parse_args()
 
+    Handler.execution_mode = args.execution_mode
     server = HTTPServer((args.host, args.port), Handler)
     print(f"translating defense controller listening on http://{args.host}:{args.port}")
+    print(f"execution mode: {args.execution_mode}")
     print("raw logs: reports/controller_actions.jsonl")
     print("translated logs: reports/controller_translated_actions.jsonl")
+    print("state: runtime/controller_state.json")
+    print("execution plan: reports/controller_execution_plan.jsonl")
     server.serve_forever()
 
 
