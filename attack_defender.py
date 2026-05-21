@@ -6,6 +6,7 @@ import json
 from pathlib import Path
 
 from src.dynamic_defense.ceni_adapter import CeniActionAdapter
+from src.dynamic_defense.ac_optimizer import TorchActorCriticOptimizer
 from src.dynamic_defense.defense_engine import DynamicDefenseEngine
 from src.dynamic_defense.torch_detector import TorchFlowDetector
 from src.dynamic_defense.feature_extractor import ThreatFeatureMatcher, build_heuristic_templates, build_templates_from_labeled_csv
@@ -28,6 +29,11 @@ def main() -> None:
     parser.add_argument("--torch-model", default="models/torch_flow_classifier.pt")
     parser.add_argument("--torch-meta", default="models/torch_flow_classifier_meta.json")
     parser.add_argument("--torch-threshold", type=float, default=0.70)
+    parser.add_argument("--optimizer", choices=["heuristic", "actor_critic"], default="heuristic")
+    parser.add_argument("--ac-model", default="models/actor_critic_policy.pt")
+    parser.add_argument("--ac-meta", default="models/actor_critic_policy_meta.json")
+    parser.add_argument("--ac-lr", type=float, default=0.001)
+    parser.add_argument("--ac-gamma", type=float, default=0.95)
     parser.add_argument("--out-csv", default="reports/dynamic_defense_events.csv")
     parser.add_argument("--out-json", default="reports/dynamic_defense_summary.json")
     args = parser.parse_args()
@@ -51,6 +57,17 @@ def main() -> None:
             device="cpu",
         )
 
+    optimizer = None
+    if args.optimizer == "actor_critic":
+        optimizer = TorchActorCriticOptimizer(
+            store=store,
+            lr=args.ac_lr,
+            gamma=args.ac_gamma,
+            device="cpu",
+            model_path=args.ac_model,
+            meta_path=args.ac_meta,
+        )
+
     engine = DynamicDefenseEngine(
         store=store,
         matcher=matcher,
@@ -58,13 +75,17 @@ def main() -> None:
         detector_mode=args.detector,
         torch_detector=torch_detector,
         torch_confidence_threshold=args.torch_threshold,
+        optimizer=optimizer,
     )
     events = engine.run_on_csv(args.input, window_size=args.window_size, limit=args.limit)
+    if args.optimizer == "actor_critic":
+        engine.optimizer.save(args.ac_model, args.ac_meta)
 
     Path(args.out_csv).parent.mkdir(parents=True, exist_ok=True)
     events.to_csv(args.out_csv, index=False)
     summary = {
         "detector": args.detector,
+        "optimizer": args.optimizer,
         "windows": int(len(events)),
         "adjustment_events": int(events["adjustment_triggered"].sum()) if len(events) else 0,
         "detection_success_rate": float(events["detection_success"].mean()) if len(events) and "detection_success" in events.columns else 0.0,

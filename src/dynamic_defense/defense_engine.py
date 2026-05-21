@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import inspect
 from dataclasses import asdict
 from typing import Dict, List, Optional
 
@@ -26,11 +27,12 @@ class DynamicDefenseEngine:
         detector_mode: str = "template",
         torch_detector=None,
         torch_confidence_threshold: float = 0.70,
+        optimizer=None,
     ):
         self.store = store
         self.matcher = matcher
         self.adapter = adapter
-        self.optimizer = ActorCriticLikeOptimizer(store, epsilon=epsilon)
+        self.optimizer = optimizer if optimizer is not None else ActorCriticLikeOptimizer(store, epsilon=epsilon)
         self.confidence_threshold = confidence_threshold
         self.detector_mode = detector_mode
         self.torch_detector = torch_detector
@@ -40,6 +42,30 @@ class DynamicDefenseEngine:
     @staticmethod
     def _is_attack_label(label: str) -> bool:
         return str(label).strip().upper() not in BENIGN_LABELS and str(label).strip() != ""
+
+    @staticmethod
+    def _supports_parameter(func, name: str) -> bool:
+        try:
+            sig = inspect.signature(func)
+        except (TypeError, ValueError):
+            return False
+        return any(
+            param.kind == inspect.Parameter.VAR_KEYWORD or param.name == name
+            for param in sig.parameters.values()
+        )
+
+    def _select_policy(self, attack_type: str, state_context: Dict):
+        if self._supports_parameter(self.optimizer.select, "state_context"):
+            return self.optimizer.select(attack_type, state_context=state_context)
+        return self.optimizer.select(attack_type)
+
+    def _observe_policy(self, strategy_id: str, reward: float, success: bool, state_context: Dict) -> None:
+        kwargs = {"reward": reward, "success": success}
+        if self._supports_parameter(self.optimizer.observe, "state_context"):
+            kwargs["state_context"] = state_context
+        if self._supports_parameter(self.optimizer.observe, "next_state_context"):
+            kwargs["next_state_context"] = None
+        self.optimizer.observe(strategy_id, **kwargs)
 
     def run_on_csv(self, csv_path: str, window_size: int = 200, limit: Optional[int] = None) -> pd.DataFrame:
         df = pd.read_csv(csv_path, nrows=limit)
@@ -98,7 +124,20 @@ class DynamicDefenseEngine:
 
         raw_attack_type = attack_type
         effective_attack_type = attack_type if detected_as_attack else "BENIGN"
-        policy = self.optimizer.select(effective_attack_type)
+        context = {
+            "window_id": window_id,
+            "attack_type": effective_attack_type,
+            "raw_matched_attack_type": raw_attack_type,
+            "avg_match_score": avg_score,
+            "attack_present_by_label": attack_present,
+            "rows": int(len(window)),
+            "detector_source": detector_source,
+            "template_attack_type": template_attack_type,
+            "template_score": template_score,
+            "torch_label": torch_label,
+            "torch_confidence": torch_confidence,
+        }
+        policy = self._select_policy(effective_attack_type, context)
 
         # defense_success：动态防御是否触发了合理响应。
         # 这个指标关注策略选择、模型切换、限速、隔离、日志增强等动作是否被调度。
@@ -123,23 +162,10 @@ class DynamicDefenseEngine:
         else:
             reward = -1.0 - policy.cost
 
-        self.optimizer.observe(policy.strategy_id, reward=reward, success=defense_success)
+        self._observe_policy(policy.strategy_id, reward=reward, success=defense_success, state_context=context)
 
         adjustment_triggered = self.current_strategy_id != policy.strategy_id or attack_present
         self.current_strategy_id = policy.strategy_id
-        context = {
-            "window_id": window_id,
-            "attack_type": effective_attack_type,
-            "raw_matched_attack_type": raw_attack_type,
-            "avg_match_score": avg_score,
-            "attack_present_by_label": attack_present,
-            "rows": int(len(window)),
-            "detector_source": detector_source,
-            "template_attack_type": template_attack_type,
-            "template_score": template_score,
-            "torch_label": torch_label,
-            "torch_confidence": torch_confidence,
-        }
         action_results = self.adapter.execute_actions(policy.strategy_id, policy.actions, context) if adjustment_triggered else []
         return [
             {
