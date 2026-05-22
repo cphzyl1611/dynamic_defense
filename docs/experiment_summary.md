@@ -29,6 +29,63 @@ The final archive stores experiment outputs as artifacts. Normal `reports/` and 
 
 The CENI validation confirms that the generated `dynamic_defense.json` matches the expected input schema for the multi-VM controller integration.
 
+## Minority Scenario Validation
+
+The minority scenario is a supplemental ordered scenario for window-level validation of rare CICIDS2017 classes, especially `Heartbleed` and `Web Attack Sql Injection`.
+
+Included labels:
+
+- `BENIGN`
+- `Heartbleed`
+- `Web Attack Sql Injection`
+- `Web Attack XSS`
+- `Web Attack Brute Force`
+
+Dataset size:
+
+| Item | Value |
+|---|---:|
+| Classes | 5 |
+| Rows per class | 200 |
+| `total_rows` | 1000 |
+
+Oversampling record:
+
+| Label | Original rows | Sampled rows | Oversampled |
+|---|---:|---:|---|
+| `Heartbleed` | 11 | 200 | true |
+| `Web Attack Sql Injection` | 21 | 200 | true |
+
+The minority FlowMLP accuracy is `0.72`. This model is only used for targeted functional validation of rare-class detection and strategy routing, not as a production traffic classifier.
+
+Minority dynamic-defense result:
+
+| Metric | Value |
+|---|---:|
+| `windows` | 5 |
+| `adjustment_events` | 5 |
+| `detection_success_rate` | 1.0 |
+| `defense_success_rate` | 1.0 |
+| `attack_type_accuracy.exact` | 1.0 |
+| `attack_type_accuracy.family` | 1.0 |
+| `strategy_match_accuracy` | 1.0 |
+
+Detector source counts:
+
+| Source | Count |
+|---|---:|
+| `template_fallback` | 3 |
+| `torch` | 2 |
+
+Strategy coverage:
+
+- `Heartbleed` -> `s_heartbleed_deep_inspection`
+- `Web Attack*` -> `s_web_attack_strict`
+
+The exported CENI `dynamic_defense.json` for the minority run also passed `optimize/multi_vm/validate_defense_inputs.py`.
+
+Minority CSV files, minority model weights, and minority experiment artifacts are local experiment outputs. They are not committed to Git; archive them outside normal source control or copy only selected final outputs into an `artifacts/` directory when a reproducible experiment snapshot is required.
+
 ## Commands
 
 Build the expanded ordered scenario from local CICIDS2017 CSV files:
