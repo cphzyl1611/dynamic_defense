@@ -25,6 +25,7 @@ EXPECTED_STRATEGY_BY_FAMILY = {
     "Heartbleed": "s_heartbleed_deep_inspection",
     "UNKNOWN": "s_unknown_similarity",
 }
+KNOWN_STRATEGY_FAMILIES = set(EXPECTED_STRATEGY_BY_FAMILY.keys())
 
 
 def normalize_label(label: Optional[str]) -> str:
@@ -53,6 +54,13 @@ def attack_family(label: Optional[str]) -> str:
     if value == "UNKNOWN":
         return "UNKNOWN"
     return value
+
+
+def strategy_family_label(label: Optional[str]) -> str:
+    family = attack_family(label)
+    if family in KNOWN_STRATEGY_FAMILIES:
+        return family
+    return "UNKNOWN"
 
 
 def expected_strategy_for_label(label: Optional[str]) -> Optional[str]:

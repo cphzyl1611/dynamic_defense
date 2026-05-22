@@ -2,6 +2,7 @@ from pathlib import Path
 import argparse
 import json
 import random
+import sys
 
 import numpy as np
 import pandas as pd
@@ -10,6 +11,12 @@ import torch.nn as nn
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import StandardScaler, LabelEncoder
 from sklearn.metrics import accuracy_score, classification_report
+
+ROOT = Path(__file__).resolve().parents[1]
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
+
+from src.dynamic_defense.evaluation import strategy_family_label
 
 
 BASIC_FEATURE_COLUMNS = [
@@ -187,6 +194,53 @@ def load_dataset(path: str, feature_set: str):
     return x, y, feature_columns
 
 
+def prepare_labels(y_raw, label_mode: str):
+    labels = np.asarray([str(label).strip() for label in y_raw], dtype=object)
+    original_label_count = {str(k): int(v) for k, v in pd.Series(labels).value_counts().sort_index().to_dict().items()}
+
+    if label_mode == "exact":
+        training_labels = labels
+        keep_mask = np.ones(len(labels), dtype=bool)
+        dropped_unknown_rows = 0
+        label_mapping_summary = {
+            label: {
+                "mapped_label": label,
+                "rows": count,
+                "kept": True,
+            }
+            for label, count in original_label_count.items()
+        }
+    elif label_mode == "family":
+        mapped_labels = np.asarray([strategy_family_label(label) for label in labels], dtype=object)
+        keep_mask = mapped_labels != "UNKNOWN"
+        dropped_unknown_rows = int((~keep_mask).sum())
+        training_labels = mapped_labels[keep_mask]
+        label_mapping_summary = {}
+        for label, count in original_label_count.items():
+            mapped = strategy_family_label(label)
+            label_mapping_summary[label] = {
+                "mapped_label": mapped,
+                "rows": int(count),
+                "kept": mapped != "UNKNOWN",
+            }
+    else:
+        raise RuntimeError("unsupported label_mode: %s" % label_mode)
+
+    if len(training_labels) == 0:
+        raise RuntimeError("no training labels remain after label_mode=%s normalization" % label_mode)
+
+    training_label_count = {
+        str(k): int(v)
+        for k, v in pd.Series(training_labels).value_counts().sort_index().to_dict().items()
+    }
+    return training_labels, keep_mask, {
+        "original_label_count": original_label_count,
+        "training_label_count": training_label_count,
+        "label_mapping_summary": label_mapping_summary,
+        "dropped_unknown_rows": dropped_unknown_rows,
+    }
+
+
 def make_class_weight(y_train, num_classes: int, mode: str):
     if mode == "none":
         return None
@@ -223,15 +277,19 @@ def main():
     parser.add_argument("--patience", type=int, default=20)
     parser.add_argument("--class-weight", choices=["none", "balanced"], default="none")
     parser.add_argument("--seed", type=int, default=42)
+    parser.add_argument("--label-mode", choices=["exact", "family"], default="exact")
     args = parser.parse_args()
 
     set_seed(args.seed)
     device = torch.device("cpu")
 
     x, y_raw, feature_columns = load_dataset(args.input, args.feature_set)
+    y_labels, label_keep_mask, label_meta = prepare_labels(y_raw, args.label_mode)
+    if not label_keep_mask.all():
+        x = x[label_keep_mask]
 
     label_encoder = LabelEncoder()
-    y = label_encoder.fit_transform(y_raw)
+    y = label_encoder.fit_transform(y_labels)
 
     scaler = StandardScaler()
     x = scaler.fit_transform(x).astype("float32")
@@ -323,6 +381,7 @@ def main():
     meta = {
         "model_type": "FlowMLP",
         "feature_set": args.feature_set,
+        "label_mode": args.label_mode,
         "feature_columns": feature_columns,
         "labels": label_encoder.classes_.tolist(),
         "scaler_mean": scaler.mean_.tolist(),
@@ -343,6 +402,7 @@ def main():
         "device": "cpu",
         "accuracy": float(test_acc),
     }
+    meta.update(label_meta)
     meta_path.write_text(json.dumps(meta, ensure_ascii=False, indent=2), encoding="utf-8")
 
     print("\nSaved model: %s" % model_path)

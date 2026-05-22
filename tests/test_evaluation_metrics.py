@@ -5,6 +5,7 @@ from src.dynamic_defense.evaluation import (
     build_evaluation_summary,
     expected_strategy_for_label,
     normalize_label,
+    strategy_family_label,
     strategy_matches_label,
 )
 
@@ -19,6 +20,9 @@ def test_attack_family_normalization():
     assert attack_family("Web Attack XSS") == "Web Attack"
     assert attack_family("Web Attack Sql Injection") == "Web Attack"
     assert attack_family("FTP-Patator") == "Brute Force"
+    assert strategy_family_label("NORMAL") == "BENIGN"
+    assert strategy_family_label("Web Attack Brute Force") == "Web Attack"
+    assert strategy_family_label("Infiltration") == "UNKNOWN"
 
 
 def test_strategy_match_for_label_families():
