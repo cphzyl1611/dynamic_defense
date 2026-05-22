@@ -1,88 +1,177 @@
-# 多模态网络动态防御测试原型（对应测试用例 34/35/36）
+# dynamic_defense
 
-这个原型用于把测试大纲 3.4 的三个动态防御条目先跑通：
+`dynamic_defense` 是一个面向 CICIDS2017 流量场景的动态防御原型。项目把策略库、特征匹配、PyTorch 检测、Actor-Critic 策略优化、REST 控制器翻译、状态化动作执行计划和 CENI 文件接口串成一条可验证流程，用于实验动态防御策略切换与 CENI 大屏对接。
 
-- `strategy_loader.py`：测试用例 34，加载防御策略库并输出策略元数据。
-- `feature_analyzer.py`：测试用例 35，对 CICIDS 2017 风格流量特征做向量化与威胁模板匹配。
-- `attack_defender.py`：测试用例 36，在持续攻击数据窗口上触发策略选择、策略切换和在线收益更新。
+当前实现重点是“可复现实验闭环”，不是生产 IDS/IPS。网络动作默认不真实修改系统网络，只生成 `controller_state.json` 和 `controller_execution_plan.jsonl`。
 
-## 目录
+## 模块结构
 
 ```text
-configs/strategies.yaml              # 防御策略库配置
-configs/feature_templates.yaml        # 特征字段与启发式模板
-src/dynamic_defense/                  # 核心模块
-strategy_loader.py                    # 用例34入口
-feature_analyzer.py                   # 用例35入口
-attack_defender.py                    # 用例36入口
-scripts/make_sample_cicids.py         # 生成可跑通的示例数据
-reports/                              # 运行输出
+configs/strategies.yaml                         # 动态防御策略库
+configs/feature_templates.yaml                  # CICIDS2017 特征模板配置
+strategy_loader.py                              # 策略库导入 SQLite
+feature_analyzer.py                             # 模板匹配与特征分析
+attack_defender.py                              # 动态防御主流程
+src/dynamic_defense/
+  ac_optimizer.py                               # PyTorch Actor-Critic optimizer
+  action_executor.py                            # stateful/simulated/shell 执行框架
+  ceni_adapter.py                               # dry-run/rest/local 动作适配
+  defense_engine.py                             # template/torch/hybrid 检测编排
+  optimizer.py                                  # heuristic optimizer
+  policy_store.py                               # PolicyStore/DefensePolicy
+  torch_detector.py                             # CPU PyTorch FlowMLP 检测器
+scripts/
+  make_cicids2017_subset.py                     # 13 类 expanded CICIDS2017 场景抽取
+  train_torch_flow_classifier.py                # FlowMLP 训练入口，支持 --input
+  translating_defense_controller.py             # REST 动作翻译控制器
+  export_ceni_dynamic_defense_status.py         # CENI dynamic_defense.json 导出
+  check_deployment_readiness.py                 # 部署前检查
+  check_network_action_environment.py           # 网络执行环境只读探测
+docs/experiment_summary.md                      # 最终实验结果摘要
+artifacts/                                      # 已归档实验结果
 ```
 
-## 本地快速运行
+## 环境配置
+
+推荐在 Linux/Ubuntu 或 CENI VM 中使用 Python 3.7+。本仓库测试使用 `dd37` Conda 环境：
+
+```bash
+conda env create -f environment.yml
+conda activate dd37
+```
+
+如果使用 venv，需要安装基础依赖，并额外准备 CPU 版 PyTorch 与 scikit-learn：
 
 ```bash
 python -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
+pip install scikit-learn
+# 按你的 Python/CUDA 环境安装 CPU 版 torch；本项目默认 device=cpu
+```
 
+部署前可运行：
+
+```bash
+python scripts/check_deployment_readiness.py
+python scripts/check_network_action_environment.py
+```
+
+## 基础运行
+
+使用内置小样本跑通策略库、特征模板和动态防御：
+
+```bash
 python scripts/make_sample_cicids.py --out data/sample_cicids.csv
 python strategy_loader.py --config configs/strategies.yaml --db data/policies.sqlite
 python feature_analyzer.py --input data/sample_cicids.csv --build-templates --limit 300
-python attack_defender.py --input data/sample_cicids.csv --build-templates --window-size 100 --limit 700
+python attack_defender.py \
+  --input data/sample_cicids.csv \
+  --build-templates \
+  --window-size 100 \
+  --limit 700
 ```
 
-运行后重点查看：
-
-- `reports/strategy_metadata.json`：策略 ID、模型类型、最后更新时间等元数据。
-- `reports/feature_match_report.csv`：每条流记录的特征匹配结果。
-- `reports/dynamic_defense_events.csv`：每个时间窗口是否触发策略调整、选择的策略、奖励和动作日志。
-
-## 替换为真实 CICIDS 2017 数据
-
-把 CSV 放到 `data/` 下，然后执行：
+hybrid 检测与 Actor-Critic optimizer：
 
 ```bash
-python strategy_loader.py
-python feature_analyzer.py --input data/Friday-WorkingHours-Afternoon-DDos.pcap_ISCX.csv --build-templates --limit 5000
-python attack_defender.py --input data/Friday-WorkingHours-Afternoon-DDos.pcap_ISCX.csv --build-templates --window-size 500 --limit 50000
+python attack_defender.py \
+  --input data/cicids2017_subset/cicids2017_scenario_ordered.csv \
+  --build-templates \
+  --window-size 200 \
+  --limit 2000 \
+  --detector hybrid \
+  --torch-threshold 0.70 \
+  --optimizer actor_critic
 ```
 
-脚本兼容部分 CICIDS 新旧列名，例如 `Dst Port`/`Destination Port`、`Flow Byts/s`/`Flow Bytes/s`。
+主要运行产物在 `reports/`、`runtime/` 和 `models/` 下。`reports/` 与 `runtime/` 是运行输出，不应作为普通代码变更提交；需要保存实验结果时放入 `artifacts/` 归档目录。
 
-## CENI 上的落地方式
+## Expanded CICIDS2017 实验
 
-建议在 CENI 中创建一个小型试验拓扑：
-
-```text
-traffic-replay VM  ->  defense VM  ->  service/victim VM
-                         |
-                    controller VM
-```
-
-部署建议：
-
-1. 在 `defense VM` 部署本项目，运行 `strategy_loader.py`、`feature_analyzer.py`、`attack_defender.py`。
-2. `traffic-replay VM` 只回放已授权/离线数据集或生成 benign/attack-like 测试流，不对公网或无授权目标发起真实攻击。
-3. `controller VM` 部署你们已有的 Ryu/ONOS/P4Runtime/自研控制器接口。
-4. `attack_defender.py` 默认 `--adapter dry_run`，只记录动作。要联动控制器时改为：
+不要把 CICIDS2017 原始大文件提交到仓库。将原始 CSV 放在本地或 VM 的外部目录，然后抽取平衡的 13 类 expanded scenario：
 
 ```bash
-export CENI_CONTROLLER_ENDPOINT=http://<controller-vm-ip>:8080
-python attack_defender.py --input data/xxx.csv --adapter rest
+python scripts/make_cicids2017_subset.py \
+  --raw-dir /path/to/CICIDS2017/csv \
+  --rows-per-class 200
 ```
 
-控制器侧需要实现：
+默认输出：
 
 ```text
-POST /defense/action
-Content-Type: application/json
+data/cicids2017_subset/cicids2017_expanded_scenario_ordered.csv
+data/cicids2017_subset/cicids2017_expanded_summary.json
 ```
 
-请求体包含 `strategy_id`、`action`、`context`。这样可以把策略动作映射为 SDN 流表、P4 表项、VSR 路由策略、限速或隔离操作。
+训练 expanded FlowMLP 检测模型：
 
-## 现在这版的边界
+```bash
+python scripts/train_torch_flow_classifier.py \
+  --input data/cicids2017_subset/cicids2017_expanded_scenario_ordered.csv \
+  --model-out models/torch_flow_classifier_expanded.pt \
+  --meta-out models/torch_flow_classifier_expanded_meta.json
+```
 
-- 这是一版“测试大纲可运行原型”，不是最终生产级 IDS/IPS。
-- 在线优化采用可解释的 actor-critic-like bandit 近似：actor 负责按攻击类型产生候选策略，critic 使用运行奖励评估策略收益。
-- 如果老师要求严格的 A2C/PPO，可以保持脚本入口不变，只替换 `src/dynamic_defense/optimizer.py`。
+运行 expanded 动态防御实验：
+
+```bash
+python strategy_loader.py --config configs/strategies.yaml --db data/policies.sqlite
+
+python attack_defender.py \
+  --input data/cicids2017_subset/cicids2017_expanded_scenario_ordered.csv \
+  --build-templates \
+  --window-size 200 \
+  --limit 2200 \
+  --detector hybrid \
+  --torch-model models/torch_flow_classifier_expanded.pt \
+  --torch-meta models/torch_flow_classifier_expanded_meta.json \
+  --torch-threshold 0.70 \
+  --optimizer actor_critic \
+  --adapter rest \
+  --controller-endpoint http://127.0.0.1:18082
+```
+
+对应 REST 控制器可在另一个终端启动：
+
+```bash
+python scripts/translating_defense_controller.py \
+  --host 127.0.0.1 \
+  --port 18082 \
+  --execution-mode stateful
+```
+
+当前 `ActionExecutor` 的网络动作边界：
+
+- `simulated`：只记录计划和状态，不执行命令。
+- `stateful`：更新 `runtime/controller_state.json`，并写 `reports/controller_execution_plan.jsonl`。
+- `shell`：预留真实执行结构；`rate_limit` / `isolate_flow` 默认 `BLOCKED_FOR_SAFETY`。
+
+也就是说，本项目当前没有真实执行 `tc`、`iptables` 或 `ovs-ofctl` 修改命令。
+
+## CENI 文件接口导出
+
+CENI controller 文件接口约定：
+
+```text
+读取: /tmp/optimize_multi_vm_runtime/defense_feeds/network_status.json
+写入: /tmp/optimize_multi_vm_runtime/defense_inputs/dynamic_defense.json
+```
+
+导出 dynamic_defense 状态：
+
+```bash
+python scripts/export_ceni_dynamic_defense_status.py \
+  --network-status /tmp/optimize_multi_vm_runtime/defense_feeds/network_status.json \
+  --out-json /tmp/optimize_multi_vm_runtime/defense_inputs/dynamic_defense.json
+```
+
+脚本会读取 `reports/dynamic_defense_summary.json`、`reports/dynamic_defense_events.csv`、`runtime/controller_state.json` 和 `reports/controller_execution_plan.jsonl`，并用 `.tmp` + `os.replace()` 原子写入 CENI 输入文件。
+
+导出后可在 optimize/multi_vm 工程侧校验：
+
+```bash
+python optimize/multi_vm/validate_defense_inputs.py
+```
+
+最终 expanded REST + stateful + CENI validation 实验结果见 [docs/experiment_summary.md](docs/experiment_summary.md)。
