@@ -12,16 +12,36 @@ import torch.nn as nn
 
 
 class FlowMLP(nn.Module):
-    def __init__(self, input_dim: int, num_classes: int):
+    def __init__(
+        self,
+        input_dim: int,
+        num_classes: int,
+        hidden_dim: int = 64,
+        num_layers: int = 2,
+        dropout: float = 0.1,
+        legacy: bool = False,
+    ):
         super().__init__()
-        self.net = nn.Sequential(
-            nn.Linear(input_dim, 64),
-            nn.ReLU(),
-            nn.Dropout(0.15),
-            nn.Linear(64, 32),
-            nn.ReLU(),
-            nn.Linear(32, num_classes),
-        )
+        if legacy:
+            self.net = nn.Sequential(
+                nn.Linear(input_dim, 64),
+                nn.ReLU(),
+                nn.Dropout(0.15),
+                nn.Linear(64, 32),
+                nn.ReLU(),
+                nn.Linear(32, num_classes),
+            )
+        else:
+            layers = []
+            prev_dim = input_dim
+            for _ in range(max(1, int(num_layers))):
+                layers.append(nn.Linear(prev_dim, int(hidden_dim)))
+                layers.append(nn.ReLU())
+                if float(dropout) > 0.0:
+                    layers.append(nn.Dropout(float(dropout)))
+                prev_dim = int(hidden_dim)
+            layers.append(nn.Linear(prev_dim, num_classes))
+            self.net = nn.Sequential(*layers)
 
     def forward(self, x):
         return self.net(x)
@@ -63,9 +83,14 @@ class TorchFlowDetector:
         self.scaler_scale = np.asarray(self.meta["scaler_scale"], dtype=np.float32)
         self.scaler_scale[self.scaler_scale == 0] = 1.0
 
+        legacy_architecture = "hidden_dim" not in self.meta and "num_layers" not in self.meta
         self.model = FlowMLP(
             input_dim=int(self.meta["input_dim"]),
             num_classes=int(self.meta["num_classes"]),
+            hidden_dim=int(self.meta.get("hidden_dim", 64)),
+            num_layers=int(self.meta.get("num_layers", 2)),
+            dropout=float(self.meta.get("dropout", 0.1)),
+            legacy=legacy_architecture,
         )
         state = torch.load(str(self.model_path), map_location=self.device)
         self.model.load_state_dict(state)

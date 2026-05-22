@@ -8,7 +8,7 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 import pandas as pd
-from sklearn.metrics import accuracy_score, classification_report, confusion_matrix
+from sklearn.metrics import accuracy_score, classification_report, confusion_matrix, f1_score, precision_recall_fscore_support
 
 from src.dynamic_defense.torch_detector import TorchFlowDetector
 
@@ -33,12 +33,44 @@ def main():
     out["Label"] = out["Label"].astype(str).str.strip()
 
     accuracy = accuracy_score(out["Label"], out["torch_predicted_label"])
+    macro_f1 = f1_score(out["Label"], out["torch_predicted_label"], labels=detector.labels, average="macro", zero_division=0)
+    weighted_f1 = f1_score(out["Label"], out["torch_predicted_label"], labels=detector.labels, average="weighted", zero_division=0)
     labels = detector.labels
+    precision, recall, f1, support = precision_recall_fscore_support(
+        out["Label"],
+        out["torch_predicted_label"],
+        labels=labels,
+        zero_division=0,
+    )
+    per_class = {
+        label: {
+            "precision": float(precision[i]),
+            "recall": float(recall[i]),
+            "f1": float(f1[i]),
+            "support": int(support[i]),
+        }
+        for i, label in enumerate(labels)
+    }
+    cm = confusion_matrix(out["Label"], out["torch_predicted_label"], labels=labels)
 
     summary = {
         "rows": int(len(out)),
         "accuracy": float(accuracy),
+        "macro_f1": float(macro_f1),
+        "weighted_f1": float(weighted_f1),
         "labels": labels,
+        "per_class": per_class,
+        "classification_report": classification_report(
+            out["Label"],
+            out["torch_predicted_label"],
+            labels=labels,
+            output_dict=True,
+            zero_division=0,
+        ),
+        "confusion_matrix": {
+            "labels": labels,
+            "matrix": cm.astype(int).tolist(),
+        },
         "predicted_counts": out["torch_predicted_label"].value_counts().to_dict(),
         "true_counts": out["Label"].value_counts().to_dict(),
         "model": args.model,
@@ -52,10 +84,10 @@ def main():
 
     print(json.dumps(summary, ensure_ascii=False, indent=2))
     print("\n=== classification report ===")
-    print(classification_report(out["Label"], out["torch_predicted_label"], labels=labels))
+    print(classification_report(out["Label"], out["torch_predicted_label"], labels=labels, zero_division=0))
     print("\n=== confusion matrix ===")
     print(pd.DataFrame(
-        confusion_matrix(out["Label"], out["torch_predicted_label"], labels=labels),
+        cm,
         index=[f"true_{x}" for x in labels],
         columns=[f"pred_{x}" for x in labels],
     ))
