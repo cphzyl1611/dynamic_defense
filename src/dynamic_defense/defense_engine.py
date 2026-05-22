@@ -116,6 +116,8 @@ class DynamicDefenseEngine:
             raise RuntimeError(f"unsupported detector_mode: {self.detector_mode}")
 
         labels = window["Label"].astype(str) if "Label" in window.columns else pd.Series([""] * len(window))
+        label_counts = labels.fillna("").astype(str).str.strip().value_counts()
+        true_majority_label = str(label_counts.index[0]) if not label_counts.empty and str(label_counts.index[0]).strip() else "UNKNOWN"
         attack_present = any(self._is_attack_label(x) for x in labels)
 
         # detection_success：检测结果是否与数据标签一致。
@@ -173,6 +175,7 @@ class DynamicDefenseEngine:
                 "rows": int(len(window)),
                 "attack_type": effective_attack_type,
                 "raw_matched_attack_type": raw_attack_type,
+                "true_majority_label": true_majority_label,
                 "avg_match_score": avg_score,
                 "detector_source": detector_source,
                 "template_attack_type": template_attack_type,

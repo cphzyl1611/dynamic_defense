@@ -8,6 +8,7 @@ from pathlib import Path
 from src.dynamic_defense.ceni_adapter import CeniActionAdapter
 from src.dynamic_defense.ac_optimizer import TorchActorCriticOptimizer
 from src.dynamic_defense.defense_engine import DynamicDefenseEngine
+from src.dynamic_defense.evaluation import build_evaluation_summary
 from src.dynamic_defense.torch_detector import TorchFlowDetector
 from src.dynamic_defense.feature_extractor import ThreatFeatureMatcher, build_heuristic_templates, build_templates_from_labeled_csv
 from src.dynamic_defense.policy_store import PolicyStore
@@ -93,6 +94,7 @@ def main() -> None:
         "strategy_counts": events["strategy_id"].value_counts().to_dict() if len(events) else {},
         "output_csv": args.out_csv,
     }
+    summary.update(build_evaluation_summary(events))
     dump_json(summary, args.out_json)
     print(json.dumps({"status": "OK", **summary}, ensure_ascii=False, indent=2))
 
