@@ -59,7 +59,11 @@ def load_dataset(path: str):
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--input", default="data/cicids2017_subset/cicids2017_3attack_subset.csv")
+    parser.add_argument(
+        "--input",
+        default="data/cicids2017_subset/cicids2017_expanded_scenario_ordered.csv",
+        help="Training CSV, for example the expanded ordered CICIDS2017 scenario",
+    )
     parser.add_argument("--model-out", default="models/torch_flow_classifier.pt")
     parser.add_argument("--meta-out", default="models/torch_flow_classifier_meta.json")
     parser.add_argument("--epochs", type=int, default=40)
