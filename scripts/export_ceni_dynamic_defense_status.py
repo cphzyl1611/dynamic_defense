@@ -224,6 +224,10 @@ def build_payload(
         "Dynamic defense detected %d adjustment event(s); attacks=%s; risk_score=%d"
         % (adjustment_events, ",".join(attack_types) if attack_types else "none", risk_score)
     )
+    summary_text = "动态防御检测到 %d 个策略调整事件，风险评分 %d，已触发动态防御响应。" % (
+        adjustment_events,
+        risk_score,
+    )
     recommendation = (
         "Review generated controller execution plan and keep ActionExecutor in stateful/simulated mode until CENI controller validation is complete."
     )
@@ -239,7 +243,15 @@ def build_payload(
         "attack_types": attack_types,
         "latest_window_id": latest_event.get("window_id") if latest_event else None,
         "strategy_id": latest_event.get("strategy_id") if latest_event else None,
+        "affected_links": links,
+        "affected_nodes": nodes,
         "updated_at": updated_at,
+    }
+
+    metrics["event_summary"] = {
+        "attack_types": attack_types,
+        "attack_counts": dict(attack_counts),
+        "latest_event": latest_event or {},
     }
 
     if controller_state:
@@ -251,13 +263,7 @@ def build_payload(
         "status": status,
         "severity": severity,
         "updated_at": updated_at,
-        "summary": {
-            "windows": metrics["windows"],
-            "adjustment_events": adjustment_events,
-            "attack_types": attack_types,
-            "attack_counts": dict(attack_counts),
-            "latest_event": latest_event or {},
-        },
+        "summary": summary_text,
         "message": message,
         "metrics": metrics,
         "alerts": [alert],

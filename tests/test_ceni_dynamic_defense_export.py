@@ -114,16 +114,22 @@ def test_export_ceni_dynamic_defense_status_generates_payload(tmp_path):
 
     assert payload["status"] == "attack_detected"
     assert payload["severity"] in {"critical", "warning"}
+    assert isinstance(payload["summary"], str)
+    assert "策略调整事件" in payload["summary"]
     assert 0 <= payload["risk_score"] <= 100
     assert payload["metrics"]["detector"] == "hybrid"
     assert payload["metrics"]["optimizer"] == "actor_critic"
     assert payload["metrics"]["windows"] == 3
     assert payload["metrics"]["adjustment_events"] == 2
     assert payload["metrics"]["strategy_counts"] == {"s_ddos_vote_rate_limit": 2}
+    assert payload["metrics"]["event_summary"]["attack_types"] == ["DDoS"]
+    assert payload["metrics"]["event_summary"]["latest_event"]["attack_type"] == "DDoS"
     assert payload["affected_links"] == ["s1-s3", "s3-s4"]
     assert payload["affected_nodes"] == ["s1", "s3", "s4"]
     assert payload["actions"] == ["switch_model", "rate_limit"]
     assert isinstance(payload["alerts"], list)
     assert payload["alerts"]
     assert isinstance(payload["alerts"][0], dict)
+    assert payload["alerts"][0]["affected_links"] == ["s1-s3", "s3-s4"]
+    assert payload["alerts"][0]["affected_nodes"] == ["s1", "s3", "s4"]
     assert payload["source"] == "dynamic_defense"
