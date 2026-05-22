@@ -29,6 +29,66 @@ The final archive stores experiment outputs as artifacts. Normal `reports/` and 
 
 The CENI validation confirms that the generated `dynamic_defense.json` matches the expected input schema for the multi-VM controller integration.
 
+## Expanded v2 Model Validation
+
+The `expanded_v2` FlowMLP model uses `scripts/train_torch_flow_classifier.py` with `feature_set=extended`. It is an improved detector for the expanded 13-class scenario while keeping the dynamic-defense main flow unchanged.
+
+Training parameters:
+
+| Parameter | Value |
+|---|---:|
+| `hidden_dim` | 128 |
+| `num_layers` | 3 |
+| `dropout` | 0.2 |
+| `lr` | 0.001 |
+| `weight_decay` | 0.0001 |
+| `batch_size` | 128 |
+| `class_weight` | `balanced` |
+| `patience` | 25 |
+| `epochs` | 120 |
+
+Standalone detector metrics:
+
+| Metric | Value |
+|---|---:|
+| `accuracy` | 0.8844 |
+| `macro_f1` | 0.8461 |
+| `weighted_f1` | 0.8639 |
+
+Compared with the previous expanded model:
+
+| Model | Accuracy |
+|---|---:|
+| Old expanded FlowMLP | approx. 0.757 |
+| `expanded_v2` FlowMLP | 0.8844 |
+
+Dynamic-defense metrics with `expanded_v2`:
+
+| Metric | Value |
+|---|---:|
+| `windows` | 11 |
+| `adjustment_events` | 11 |
+| `attack_type_accuracy.exact` | 1.0 |
+| `attack_type_accuracy.family` | 1.0 |
+| `strategy_match_accuracy` | 1.0 |
+
+Detector source counts:
+
+| Source | Count |
+|---|---:|
+| `torch` | 9 |
+| `template_fallback` | 2 |
+
+Known weak points remain in the Web Attack subclasses:
+
+| Class | Weak metric |
+|---|---:|
+| `Web Attack Brute Force` | recall = 0.10 |
+| `Web Attack Sql Injection` | f1 approx. 0.46 |
+| `Web Attack XSS` | f1 approx. 0.69 |
+
+The `expanded_v2` model weights and generated `reports/` outputs are local experiment artifacts. They are not committed to Git.
+
 ## Minority Scenario Validation
 
 The minority scenario is a supplemental ordered scenario for window-level validation of rare CICIDS2017 classes, especially `Heartbleed` and `Web Attack Sql Injection`.
