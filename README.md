@@ -13,11 +13,11 @@ strategy_loader.py                              # 策略库导入 SQLite
 feature_analyzer.py                             # 模板匹配与特征分析
 attack_defender.py                              # 动态防御主流程
 src/dynamic_defense/
-  ac_optimizer.py                               # PyTorch Actor-Critic optimizer
+  ac_optimizer.py                               # PyTorch Actor-Critic 优化器
   action_executor.py                            # stateful/simulated/shell 执行框架
   ceni_adapter.py                               # dry-run/rest/local 动作适配
   defense_engine.py                             # template/torch/hybrid 检测编排
-  optimizer.py                                  # heuristic optimizer
+  optimizer.py                                  # heuristic 优化器
   policy_store.py                               # PolicyStore/DefensePolicy
   torch_detector.py                             # CPU PyTorch FlowMLP 检测器
 scripts/
@@ -89,7 +89,7 @@ python attack_defender.py \
 
 ## Expanded CICIDS2017 实验
 
-不要把 CICIDS2017 原始大文件提交到仓库。将原始 CSV 放在本地或 VM 的外部目录，然后抽取平衡的 13 类 expanded scenario：
+不要把 CICIDS2017 原始大文件提交到仓库。将原始 CSV 放在本地或 VM 的外部目录，然后抽取平衡的 13 类 expanded 场景：
 
 ```bash
 python scripts/make_cicids2017_subset.py \
@@ -151,7 +151,7 @@ python scripts/translating_defense_controller.py \
 
 ## CENI 文件接口导出
 
-CENI controller 文件接口约定：
+CENI 控制器文件接口约定：
 
 ```text
 读取: /tmp/optimize_multi_vm_runtime/defense_feeds/network_status.json
@@ -174,4 +174,15 @@ python scripts/export_ceni_dynamic_defense_status.py \
 python optimize/multi_vm/validate_defense_inputs.py
 ```
 
-最终 expanded REST + stateful + CENI validation 实验结果见 [docs/experiment_summary.md](docs/experiment_summary.md)。
+最终 expanded REST + stateful + CENI 校验实验结果见 [docs/experiment_summary.md](docs/experiment_summary.md)。
+
+## 模型说明与限制
+
+当前仓库保留多种模型和策略路由配置，面向课程/课题验收时建议区分其用途：
+
+- `expanded_v2` FlowMLP：使用 `feature_set=extended` 的 13 类 exact 分类模型，用于展示细粒度 CICIDS2017 标签检测能力；Web Attack 子类仍存在混淆。
+- `family v3` FlowMLP：策略族级分类器，输出 `BENIGN`、`DDoS`、`PortScan`、`Brute Force`、`Web Attack`、`Heartbleed` 等策略族标签，主要用于防御策略路由，不用于 CICIDS2017 细粒度子类报告。
+- `actor_critic`：PyTorch Actor-Critic 策略优化器，和已有 heuristic 流程并存；默认流程仍可使用 heuristic。
+- `hybrid`：结合 `torch` 和模板匹配结果，低置信度或缺失模型时可回退到 `template_fallback`。
+
+当前网络动作执行仍是安全验证边界：`rate_limit` 和 `isolate_flow` 不真实运行 `tc`、`iptables` 或 `ovs-ofctl`，只更新 `runtime/controller_state.json` 并生成 `reports/controller_execution_plan.jsonl`。如需真实下发网络规则，应在 CENI/SDN 控制器侧补充审计、回滚和最小权限控制后再启用。

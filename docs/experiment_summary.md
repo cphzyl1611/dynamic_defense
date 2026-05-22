@@ -1,23 +1,23 @@
-# Experiment Summary
+# 实验结果摘要
 
-This document records the final expanded CICIDS2017 dynamic-defense experiment and the CENI file-interface validation result.
+本文档记录 expanded CICIDS2017 动态防御实验、策略族级模型验证、minority 场景专项验证，以及 CENI 文件接口对接校验结果。
 
-## Setup
+## 实验配置
 
-- Dataset scenario: expanded CICIDS2017 ordered scenario, covering 13 labels.
-- Detector mode: `hybrid`
-- Optimizer: `actor_critic`
-- Controller path: REST translating controller
-- Controller execution mode: `stateful`
-- CENI export: `/tmp/optimize_multi_vm_runtime/defense_inputs/dynamic_defense.json`
-- Validation: `optimize/multi_vm/validate_defense_inputs.py`
-- Final archive path: `artifacts/final_expanded_rest_stateful_ceni_validation/`
+- 数据场景：expanded CICIDS2017 有序场景，覆盖 13 个标签。
+- 检测模式：`hybrid`
+- 优化器：`actor_critic`
+- 控制器路径：REST 动作翻译控制器
+- 控制器执行模式：`stateful`
+- CENI 导出文件：`/tmp/optimize_multi_vm_runtime/defense_inputs/dynamic_defense.json`
+- 校验脚本：`optimize/multi_vm/validate_defense_inputs.py`
+- 最终归档路径：`artifacts/final_expanded_rest_stateful_ceni_validation/`
 
-The final archive stores experiment outputs as artifacts. Normal `reports/` and `runtime/` files are generated outputs and should not be committed unless explicitly copied into an `artifacts/` experiment directory.
+最终归档目录保存实验输出快照。普通 `reports/` 和 `runtime/` 文件属于运行生成产物，不应作为常规代码变更提交；只有在明确复制到 `artifacts/` 实验目录后，才作为实验归档保存。
 
-## Final Metrics
+## 最终指标
 
-| Metric | Value |
+| 指标 | 数值 |
 |---|---:|
 | `windows` | 11 |
 | `adjustment_events` | 11 |
@@ -25,17 +25,17 @@ The final archive stores experiment outputs as artifacts. Normal `reports/` and 
 | `optimizer` | `actor_critic` |
 | `detection_success_rate` | 1.0 |
 | `defense_success_rate` | 1.0 |
-| CENI validation | `PASS` |
+| CENI 校验 | `PASS` |
 
-The CENI validation confirms that the generated `dynamic_defense.json` matches the expected input schema for the multi-VM controller integration.
+CENI 校验结果说明生成的 `dynamic_defense.json` 符合 multi-VM 控制器集成所需输入格式，`validate_defense_inputs.py` 结果为 `PASS`。
 
-## Expanded v2 Model Validation
+## Expanded v2 模型验证
 
-The `expanded_v2` FlowMLP model uses `scripts/train_torch_flow_classifier.py` with `feature_set=extended`. It is an improved detector for the expanded 13-class scenario while keeping the dynamic-defense main flow unchanged.
+`expanded_v2` FlowMLP 模型使用 `scripts/train_torch_flow_classifier.py` 训练，并启用 `feature_set=extended`。该模型用于提升 expanded 13 类场景的检测能力，同时不改变动态防御主流程。
 
-Training parameters:
+训练参数：
 
-| Parameter | Value |
+| 参数 | 数值 |
 |---|---:|
 | `hidden_dim` | 128 |
 | `num_layers` | 3 |
@@ -47,24 +47,24 @@ Training parameters:
 | `patience` | 25 |
 | `epochs` | 120 |
 
-Standalone detector metrics:
+独立检测指标：
 
-| Metric | Value |
+| 指标 | 数值 |
 |---|---:|
 | `accuracy` | 0.8844 |
 | `macro_f1` | 0.8461 |
 | `weighted_f1` | 0.8639 |
 
-Compared with the previous expanded model:
+与旧 expanded 模型对比：
 
-| Model | Accuracy |
+| 模型 | `accuracy` |
 |---|---:|
-| Old expanded FlowMLP | approx. 0.757 |
+| 旧 expanded FlowMLP | 约 0.757 |
 | `expanded_v2` FlowMLP | 0.8844 |
 
-Dynamic-defense metrics with `expanded_v2`:
+使用 `expanded_v2` 后的动态防御指标：
 
-| Metric | Value |
+| 指标 | 数值 |
 |---|---:|
 | `windows` | 11 |
 | `adjustment_events` | 11 |
@@ -72,28 +72,89 @@ Dynamic-defense metrics with `expanded_v2`:
 | `attack_type_accuracy.family` | 1.0 |
 | `strategy_match_accuracy` | 1.0 |
 
-Detector source counts:
+`detector_source_counts`：
 
-| Source | Count |
+| 来源 | 数量 |
 |---|---:|
 | `torch` | 9 |
 | `template_fallback` | 2 |
 
-Known weak points remain in the Web Attack subclasses:
+Web Attack 子类仍然是模型弱点：
 
-| Class | Weak metric |
+| 类别 | 较弱指标 |
 |---|---:|
 | `Web Attack Brute Force` | recall = 0.10 |
-| `Web Attack Sql Injection` | f1 approx. 0.46 |
-| `Web Attack XSS` | f1 approx. 0.69 |
+| `Web Attack Sql Injection` | f1 约 0.46 |
+| `Web Attack XSS` | f1 约 0.69 |
 
-The `expanded_v2` model weights and generated `reports/` outputs are local experiment artifacts. They are not committed to Git.
+`expanded_v2` 模型权重和生成的 `reports/` 输出属于本地实验产物，不提交到 Git。
 
-## Minority Scenario Validation
+## Family v3 策略族模型验证
 
-The minority scenario is a supplemental ordered scenario for window-level validation of rare CICIDS2017 classes, especially `Heartbleed` and `Web Attack Sql Injection`.
+`family v3` FlowMLP 是策略族级分类器，目标是服务动态防御策略路由，不用于 CICIDS2017 细粒度子类报告。
 
-Included labels:
+`family v3` 标签集合：
+
+- `BENIGN`
+- `DDoS`
+- `PortScan`
+- `Brute Force`
+- `Web Attack`
+- `Heartbleed`
+
+独立检测指标：
+
+| 指标 | 数值 |
+|---|---:|
+| `accuracy` | 0.9606 |
+| `macro_f1` | 0.9584 |
+| `weighted_f1` | 0.9606 |
+| `dropped_unknown_rows` | 0 |
+
+主要类别指标：
+
+| 类别 | F1 |
+|---|---:|
+| `DDoS` | 约 0.986 |
+| `Brute Force` | 约 0.951 |
+| `Web Attack` | 约 0.924 |
+| `PortScan` | 约 0.920 |
+| `Heartbleed` | 1.0 |
+| `BENIGN` | 约 0.969 |
+
+使用 `family v3` 后的动态防御指标：
+
+| 指标 | 数值 |
+|---|---:|
+| `windows` | 11 |
+| `adjustment_events` | 11 |
+| `attack_type_accuracy.exact` | 0.2727 |
+| `attack_type_accuracy.family` | 1.0 |
+| `strategy_match_accuracy` | 1.0 |
+
+`detector_source_counts`：
+
+| 来源 | 数量 |
+|---|---:|
+| `torch` | 11 |
+
+`attack_type_accuracy.exact` 较低是预期现象，因为该模型输出策略族标签，而真实窗口标签仍包含 `DoS Hulk`、`SSH-Patator`、`Web Attack XSS` 等 CICIDS2017 细粒度标签。对于动态防御目标，策略族级结果更关键，因为这些子类最终映射到相同防御策略。
+
+REST/stateful 联调结果：
+
+| 检查项 | 结果 |
+|---|---:|
+| `controller_execution_plan.jsonl` | 30 行 |
+| 连接或运行错误 | 无 `Connection refused` / `ERROR` |
+| `validate_defense_inputs.py` | `PASS` |
+
+`family v3` 模型权重和 meta 文件已提交到 `models/`。生成的 `reports/`、`runtime/` 和 `artifacts/` 输出仍作为本地实验产物，不提交到 Git。
+
+## Minority 场景验证
+
+minority 场景是用于窗口级验证稀少类别的补充有序场景，重点覆盖 `Heartbleed` 和 `Web Attack Sql Injection`。
+
+包含标签：
 
 - `BENIGN`
 - `Heartbleed`
@@ -101,26 +162,26 @@ Included labels:
 - `Web Attack XSS`
 - `Web Attack Brute Force`
 
-Dataset size:
+数据规模：
 
-| Item | Value |
+| 项目 | 数值 |
 |---|---:|
-| Classes | 5 |
-| Rows per class | 200 |
+| 类别数 | 5 |
+| 每类行数 | 200 |
 | `total_rows` | 1000 |
 
-Oversampling record:
+过采样记录：
 
-| Label | Original rows | Sampled rows | Oversampled |
+| 标签 | 原始行数 | 抽样后行数 | 是否过采样 |
 |---|---:|---:|---|
 | `Heartbleed` | 11 | 200 | true |
 | `Web Attack Sql Injection` | 21 | 200 | true |
 
-The minority FlowMLP accuracy is `0.72`. This model is only used for targeted functional validation of rare-class detection and strategy routing, not as a production traffic classifier.
+minority FlowMLP 的 `accuracy` 为 `0.72`。该模型仅用于稀少类别检测和策略路由的专项功能验证，不作为生产级流量分类器。
 
-Minority dynamic-defense result:
+minority 动态防御结果：
 
-| Metric | Value |
+| 指标 | 数值 |
 |---|---:|
 | `windows` | 5 |
 | `adjustment_events` | 5 |
@@ -130,25 +191,25 @@ Minority dynamic-defense result:
 | `attack_type_accuracy.family` | 1.0 |
 | `strategy_match_accuracy` | 1.0 |
 
-Detector source counts:
+`detector_source_counts`：
 
-| Source | Count |
+| 来源 | 数量 |
 |---|---:|
 | `template_fallback` | 3 |
 | `torch` | 2 |
 
-Strategy coverage:
+策略覆盖：
 
 - `Heartbleed` -> `s_heartbleed_deep_inspection`
 - `Web Attack*` -> `s_web_attack_strict`
 
-The exported CENI `dynamic_defense.json` for the minority run also passed `optimize/multi_vm/validate_defense_inputs.py`.
+minority 运行导出的 CENI `dynamic_defense.json` 同样通过 `optimize/multi_vm/validate_defense_inputs.py` 校验。
 
-Minority CSV files, minority model weights, and minority experiment artifacts are local experiment outputs. They are not committed to Git; archive them outside normal source control or copy only selected final outputs into an `artifacts/` directory when a reproducible experiment snapshot is required.
+minority CSV 文件、minority 模型权重和 minority 实验归档均为本地实验输出，不提交到 Git。如需复现实验快照，应在源码管理之外归档，或只把选定最终输出复制到 `artifacts/` 目录。
 
-## Commands
+## 运行命令
 
-Build the expanded ordered scenario from local CICIDS2017 CSV files:
+从本地 CICIDS2017 CSV 文件构造 expanded 有序场景：
 
 ```bash
 python scripts/make_cicids2017_subset.py \
@@ -156,7 +217,7 @@ python scripts/make_cicids2017_subset.py \
   --rows-per-class 200
 ```
 
-Train the expanded FlowMLP model:
+训练 expanded FlowMLP 模型：
 
 ```bash
 python scripts/train_torch_flow_classifier.py \
@@ -165,7 +226,7 @@ python scripts/train_torch_flow_classifier.py \
   --meta-out models/torch_flow_classifier_expanded_meta.json
 ```
 
-Start the stateful REST controller:
+启动 `stateful` REST 控制器：
 
 ```bash
 python scripts/translating_defense_controller.py \
@@ -174,7 +235,7 @@ python scripts/translating_defense_controller.py \
   --execution-mode stateful
 ```
 
-Run dynamic defense against the expanded scenario:
+针对 expanded 场景运行动态防御：
 
 ```bash
 python attack_defender.py \
@@ -191,7 +252,7 @@ python attack_defender.py \
   --controller-endpoint http://127.0.0.1:18082
 ```
 
-Export CENI controller input:
+导出 CENI 控制器输入：
 
 ```bash
 python scripts/export_ceni_dynamic_defense_status.py \
@@ -199,34 +260,34 @@ python scripts/export_ceni_dynamic_defense_status.py \
   --out-json /tmp/optimize_multi_vm_runtime/defense_inputs/dynamic_defense.json
 ```
 
-Validate on the optimize/multi_vm side:
+在 optimize/multi_vm 侧执行校验：
 
 ```bash
 python optimize/multi_vm/validate_defense_inputs.py
 ```
 
-## Execution Boundary
+## 执行边界
 
-The final experiment uses `ActionExecutor` in `stateful` mode. It updates:
+最终实验使用 `ActionExecutor` 的 `stateful` 模式。该模式会更新：
 
 - `runtime/controller_state.json`
 - `reports/controller_execution_plan.jsonl`
 
-It does not execute real network-modifying commands. In particular, current experiments do not run real `tc`, `iptables`, or `ovs-ofctl` changes. The network actions `rate_limit` and `isolate_flow` are represented as controller execution plans and SDN/CENI intents for validation.
+该模式不会执行真实网络修改命令。当前实验没有真实运行 `tc`、`iptables` 或 `ovs-ofctl` 修改操作。网络动作 `rate_limit` 和 `isolate_flow` 只表现为控制器执行计划和 SDN/CENI 意图，用于验证对接链路。
 
-This boundary is intentional: it keeps the CENI integration safe while proving that the detection, optimization, action translation, state update, execution-plan generation, and CENI JSON export path is complete.
+这个边界是有意保留的：它在保证 CENI 集成安全的同时，验证了检测、优化、动作翻译、状态更新、执行计划生成和 CENI JSON 导出的完整流程。
 
-## Model Note
+## 模型说明
 
-The expanded FlowMLP detector accuracy is approximately `0.757`. This is sufficient for prototype validation and integration testing, but it is not a production-grade traffic classifier. Future work can improve this with:
+早期 expanded FlowMLP 检测器的 `accuracy` 约为 `0.757`，可以支持原型验证和集成测试，但不是生产级流量分类器。后续已经通过 `expanded_v2` 和 `family v3` 提升检测与策略路由效果。未来仍可从以下方向继续优化：
 
-- broader feature normalization and feature selection;
-- per-day CICIDS2017 split control;
-- class rebalancing beyond fixed rows per class;
-- deeper or better-regularized PyTorch models;
-- threshold calibration for hybrid mode;
-- evaluation on held-out CICIDS2017 files rather than only the ordered scenario.
+- 更完整的特征归一化和特征选择；
+- 按 CICIDS2017 不同日期进行更严格的数据划分；
+- 在固定每类行数之外使用更细致的类别重平衡方法；
+- 使用更深或正则化更充分的 PyTorch 模型；
+- 针对 `hybrid` 模式进行阈值校准；
+- 在独立保留的 CICIDS2017 文件上评估，而不只评估有序场景。
 
-## Data Policy
+## 数据管理原则
 
-Do not commit raw CICIDS2017 CSV files. Keep raw datasets outside the repository and generate compact scenario CSVs as needed. Generated `reports/` and `runtime/` files should also remain uncommitted unless they are intentionally copied into an `artifacts/` directory as an experiment archive.
+不要提交 CICIDS2017 原始 CSV 大文件。原始数据应保存在仓库之外，并按需生成小规模场景 CSV。生成的 `reports/` 和 `runtime/` 文件也不应提交，除非它们被明确复制到 `artifacts/` 目录作为实验归档。

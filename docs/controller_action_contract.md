@@ -6,7 +6,7 @@
 
 外部控制器可以是：
 
-- 本地 mock 控制器
+- 本地模拟控制器
 - SDN 控制器
 - CENI 平台侧编排服务
 - 后续部署在 CENI VM 上的防御控制模块
@@ -338,7 +338,7 @@ Heartbleed
 
 ## 5. 当前本地验证结果
 
-当前本地 REST 联调中，动态防御引擎通过 REST 接口向 mock 控制器下发动作。
+当前本地 REST 联调中，动态防御引擎通过 REST 接口向模拟控制器下发动作。
 
 控制器接收路径：
 
@@ -386,7 +386,7 @@ reports/controller_actions.jsonl
 
 ## 6. CENI 对接方式
 
-当前本地 mock 控制器地址为：
+当前本地模拟控制器地址为：
 
 ```text
 http://127.0.0.1:18080
@@ -442,9 +442,9 @@ POST /defense/action
 2. 基于策略库完成防御策略选择；
 3. 区分 detection_success 与 defense_success；
 4. 支持 BENIGN 监控策略，降低正常流量误触发；
-5. 支持 Actor-Critic-like reward 更新机制；
+5. 支持 Actor-Critic-like 奖励更新机制；
 6. 支持 REST 接口向外部控制器下发动作；
-7. 已通过本地 mock 控制器验证动作接收流程。
+7. 已通过本地模拟控制器验证动作接收流程。
 ```
 
 后续在 CENI 平台上部署时，需要完成：
