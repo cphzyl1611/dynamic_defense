@@ -388,7 +388,71 @@ python optimize/multi_vm/validate_defense_inputs.py
 DEFENSE_INPUT_VALIDATE_RESULT=PASS
 ```
 
-## 9. 已完成内容和未完成边界
+## 9. 真实 CENI 多 VM 大屏接入验证
+
+最终版本已经在真实 CENI 多 VM dashboard 环境完成文件协议接入展示验证。该验证使用平台侧已有 CENI controller/dashboard，不覆盖平台原有项目目录。
+
+验证环境：
+
+| 项目 | 结果 |
+|---|---|
+| host | `p4` |
+| 项目部署目录 | `/home/p4/dynamic_defense_ceni` |
+| 平台原有目录 | `/home/p4/dynamic_defense` 未覆盖 |
+| CENI controller/dashboard 来源 | `/home/p4/optimize` |
+
+接入文件：
+
+```text
+/tmp/optimize_multi_vm_runtime/defense_inputs/dynamic_defense.json
+```
+
+写入结果：
+
+| 字段 | 值 |
+|---|---|
+| `status` | `attack_detected` |
+| `severity` | `critical` |
+| `risk_score` | 75 |
+| `source` | `dynamic_defense_ceni` |
+| `version` | `v1.0-dynamic-defense-ceni` |
+| `affected_links` | `["s3-s4", "s4-s7"]` |
+| `affected_nodes` | `["s3", "s4", "s7"]` |
+| `actions` | `["monitor_only", "log_enrich", "switch_model", "raise_threshold", "rate_limit", "isolate_flow"]` |
+
+CENI 校验结果：
+
+```text
+DEFENSE_INPUT_CHECK dynamic_defense PASS
+defense_input_error_count = 0
+defense_input_warning_count = 0
+DEFENSE_INPUT_VALIDATE_RESULT = PASS
+```
+
+大屏现象：
+
+- 顶部“动态防御系统”卡片显示“发现攻击”。
+- 大屏显示 11 个策略调整事件。
+- 大屏显示风险评分 75。
+- 受影响链路和节点根据 `affected_links = ["s3-s4", "s4-s7"]`、`affected_nodes = ["s3", "s4", "s7"]` 在拓扑中触发展示。
+
+`p4` 当前 Python 环境状态：
+
+| 项目 | 状态 |
+|---|---|
+| Python | 3.8.10 |
+| `pandas` / `numpy` / `sklearn` / `yaml` | 可用 |
+| `torch` | 缺失 |
+| `requests` | 存在 SSL/OpenSSL 依赖异常 |
+
+严格边界说明：
+
+- 本次完成的是真实 CENI dashboard 文件协议接入展示验证。
+- 本次不是在 `p4` 上实时运行 PyTorch `attack_defender.py`。
+- 本次不是在 CENI 真实网络中执行 `tc`、`iptables`、`ovs-ofctl` 动作。
+- 完整 PyTorch 推理和 REST/stateful 联调已经在 Ubuntu VM 中完成。
+
+## 10. 已完成内容和未完成边界
 
 已完成内容：
 
@@ -403,16 +467,17 @@ DEFENSE_INPUT_VALIDATE_RESULT=PASS
 - `runtime/controller_state.json` 状态更新。
 - `reports/controller_execution_plan.jsonl` 执行计划生成。
 - CENI 文件协议 `dynamic_defense.json` 导出。
+- 真实 CENI 多 VM dashboard 文件协议接入展示验证。
 - `validate_defense_inputs.py` 校验通过，结果为 `PASS`。
 
 未完成边界：
 
-- 未完成 CENI 平台真实大屏展示。
+- 已完成 CENI dashboard 文件协议接入展示验证，但未完成生产化大屏部署运维。
 - 未完成 CENI 多节点真实部署。
 - 未真实执行 `tc`、`iptables`、`ovs-ofctl` 网络动作。
 - 当前 `rate_limit` 和 `isolate_flow` 仅生成执行计划与 SDN/CENI 意图。
 - 当前版本不是 CENI 真实生产环境部署版本。
 
-## 10. 老师验收可用项目总结
+## 11. 老师验收可用项目总结
 
-本项目实现了一个面向 CICIDS2017 流量场景的动态防御原型系统，完成了从防御策略库构建、威胁特征提取匹配、`FlowMLP` 检测模型、`actor_critic` 策略优化，到 REST 控制器动作翻译、stateful 执行计划生成和 CENI 文件协议导出的完整闭环。最终版本在 expanded 场景下实现 `windows = 11`、`adjustment_events = 11`、`detection_success_rate = 1.0`、`defense_success_rate = 1.0`、`attack_type_accuracy.family = 1.0`、`strategy_match_accuracy = 1.0`，并通过 `validate_defense_inputs.py` 校验，输出 `DEFENSE_INPUT_VALIDATE_RESULT=PASS`。当前版本定位为可复现的 CENI 文件协议验证版本，网络动作保持安全边界，只生成 `controller_state.json` 和 `controller_execution_plan.jsonl`，不真实修改 `tc`、`iptables` 或 `ovs-ofctl` 配置。
+本项目实现了一个面向 CICIDS2017 流量场景的动态防御原型系统，完成了从防御策略库构建、威胁特征提取匹配、`FlowMLP` 检测模型、`actor_critic` 策略优化，到 REST 控制器动作翻译、stateful 执行计划生成和 CENI 文件协议导出的完整闭环。最终版本在 expanded 场景下实现 `windows = 11`、`adjustment_events = 11`、`detection_success_rate = 1.0`、`defense_success_rate = 1.0`、`attack_type_accuracy.family = 1.0`、`strategy_match_accuracy = 1.0`，并通过 `validate_defense_inputs.py` 校验，输出 `DEFENSE_INPUT_VALIDATE_RESULT=PASS`。当前版本定位为可复现的 CENI 文件协议与 dashboard 接入展示验证版本，网络动作保持安全边界，只生成 `controller_state.json` 和 `controller_execution_plan.jsonl`，不真实修改 `tc`、`iptables` 或 `ovs-ofctl` 配置。

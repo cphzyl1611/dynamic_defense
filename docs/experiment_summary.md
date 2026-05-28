@@ -150,6 +150,70 @@ REST/stateful 联调结果：
 
 `family v3` 模型权重和 meta 文件已提交到 `models/`。生成的 `reports/`、`runtime/` 和 `artifacts/` 输出仍作为本地实验产物，不提交到 Git。
 
+## 真实 CENI 多 VM 大屏接入验证
+
+最终版本已经完成真实 CENI 多 VM dashboard 文件协议接入展示验证。该验证证明 `dynamic_defense` 可以按照 CENI controller/dashboard 约定写入 `dynamic_defense.json`，并被平台侧大屏读取和展示。
+
+验证环境：
+
+| 项目 | 结果 |
+|---|---|
+| host | `p4` |
+| 项目部署目录 | `/home/p4/dynamic_defense_ceni` |
+| 平台原有目录 | `/home/p4/dynamic_defense` 未覆盖 |
+| CENI controller/dashboard 来源 | `/home/p4/optimize` |
+
+接入文件：
+
+```text
+/tmp/optimize_multi_vm_runtime/defense_inputs/dynamic_defense.json
+```
+
+写入结果：
+
+| 字段 | 值 |
+|---|---|
+| `status` | `attack_detected` |
+| `severity` | `critical` |
+| `risk_score` | 75 |
+| `source` | `dynamic_defense_ceni` |
+| `version` | `v1.0-dynamic-defense-ceni` |
+| `affected_links` | `["s3-s4", "s4-s7"]` |
+| `affected_nodes` | `["s3", "s4", "s7"]` |
+| `actions` | `["monitor_only", "log_enrich", "switch_model", "raise_threshold", "rate_limit", "isolate_flow"]` |
+
+CENI 校验结果：
+
+```text
+DEFENSE_INPUT_CHECK dynamic_defense PASS
+defense_input_error_count = 0
+defense_input_warning_count = 0
+DEFENSE_INPUT_VALIDATE_RESULT = PASS
+```
+
+大屏现象：
+
+- 顶部“动态防御系统”卡片显示“发现攻击”。
+- 大屏显示 11 个策略调整事件。
+- 大屏显示风险评分 75。
+- `affected_links = ["s3-s4", "s4-s7"]` 和 `affected_nodes = ["s3", "s4", "s7"]` 在拓扑中触发展示。
+
+`p4` 当前 Python 环境状态：
+
+| 项目 | 状态 |
+|---|---|
+| Python | 3.8.10 |
+| `pandas` / `numpy` / `sklearn` / `yaml` | 可用 |
+| `torch` | 缺失 |
+| `requests` | 存在 SSL/OpenSSL 依赖异常 |
+
+验证边界：
+
+- 本次完成的是真实 CENI dashboard 文件协议接入展示验证。
+- 本次不是在 `p4` 上实时运行 PyTorch `attack_defender.py`。
+- 本次不是在 CENI 真实网络中执行 `tc`、`iptables`、`ovs-ofctl` 动作。
+- 完整 PyTorch 推理和 REST/stateful 联调已经在 Ubuntu VM 中完成。
+
 ## Minority 场景验证
 
 minority 场景是用于窗口级验证稀少类别的补充有序场景，重点覆盖 `Heartbleed` 和 `Web Attack Sql Injection`。
